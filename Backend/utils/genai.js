@@ -1,5 +1,13 @@
 import { Mistral } from "@mistralai/mistralai";
 import { getFallback } from "./fallbacks.js";
+import {
+  buildExtractClaimsPrompt,
+  buildVerdictPrompt,
+  buildAIDetectionPrompt,
+  buildLanguageDetectionPrompt,
+  extractAndParseJSON,
+} from "./multilingual.js";
+import { normalizeLanguage } from "./languageUtils.js";
 
 // Model to use — mistral-small-latest is fast, capable, and on the free tier
 const MODEL_NAME = "mistral-small-latest";
@@ -76,15 +84,11 @@ const parseJson = (text, ctx) => {
 
 // ── Exported functions ────────────────────────────────────────────────────────
 
-export const extractClaims = async (text) => {
+export const extractClaims = async (text, responseLanguage = "en") => {
   if (!text?.trim()) throw new Error("Text is required");
 
-  const system = `You extract factual claims from articles for fact-checking.
-Identify 1 to 7 distinct, specific, checkable factual claims. If the input is a single checkable factual sentence, return it as one claim.
-Each must be a standalone statement verifiable against external sources.
-Do NOT include opinions, predictions, questions, commands, or vague statements.
-Respond ONLY with a valid JSON array, no other text:
-[{ "claim": "..." }]`;
+  const language = normalizeLanguage(responseLanguage);
+  const system = buildExtractClaimsPrompt(language);
 
   try {
     const raw = await callMistral(system, text, "extractClaims");
@@ -104,13 +108,7 @@ Respond ONLY with a valid JSON array, no other text:
 export const detectAndTranslate = async (text) => {
   if (!text?.trim()) throw new Error("Text is required");
 
-  const system = `Detect the language of the text and translate to English if needed.
-Rules:
-- Detect the ISO 639-1 language code (e.g. "en", "hi", "es").
-- If already English, set translatedText to the original text unchanged.
-- If not English, provide an accurate English translation.
-Respond ONLY with valid JSON, no other text:
-{ "language": "hi", "translatedText": "..." }`;
+  const system = buildLanguageDetectionPrompt();
 
   try {
     const raw = await callMistral(system, text, "detectAndTranslate");
@@ -124,69 +122,11 @@ Respond ONLY with valid JSON, no other text:
   }
 };
 
-export const compareClaimWithSources = async (claim, sources) => {
+export const compareClaimWithSources = async (claim, sources, responseLanguage = "en") => {
   if (!claim?.trim()) throw new Error("Claim is required");
 
-  const system = `You are a fact-checking assistant with access to the supplied sources below. Use them as your primary evidence.
-
-VERDICT RULES — apply in this order:
-
-────────────────────────────────────────────
-"Supported"
-────────────────────────────────────────────
-A supplied source directly and clearly confirms that the claim is true.
-
-────────────────────────────────────────────
-"Contradicted"
-────────────────────────────────────────────
-Use "Contradicted" when EITHER condition is met using supplied sources:
-
-  1. DIRECT contradiction:
-     A source explicitly states the opposite of the claim.
-     Example: Claim = "India won the 2022 FIFA World Cup"
-              Source: "Argentina won the 2022 FIFA World Cup" → Contradicted
-
-  2. LOGICAL contradiction:
-     A source provides authoritative facts that make the claim factually impossible,
-     even if it does not use the exact same words.
-     Example: Claim = "The Moon is made of cheese."
-              Source: "The Moon is composed primarily of silicate rock and metal." → Contradicted
-     Example: Claim = "Water boils at 50 degrees C at sea level."
-              Source: "Water boils at 100 degrees C at standard atmospheric pressure." → Contradicted
-
-  Key test: Could a reasonable person conclude from the source's facts alone
-  that the claim is false? If yes, use Contradicted.
-
-────────────────────────────────────────────
-"Unverified"
-────────────────────────────────────────────
-Use ONLY when supplied sources have no meaningful bearing on the claim:
-  - No sources supplied
-  - Sources discuss a related but different topic and cannot confirm or deny the claim
-  - Sources are too vague or general to draw any conclusion
-  Example: Claim = "Aliens secretly built the pyramids."
-           Sources discuss pyramid architecture but say nothing about alien involvement → Unverified
-
-────────────────────────────────────────────
-CONFIDENCE SCORING (integer 0-100):
-────────────────────────────────────────────
-Supported:
-  - Multiple trusted sources (reuters, bbc, nasa, wikipedia etc.) explicitly support → 90-100
-  - One trusted source supports → 75-89
-  - Only lower-credibility sources support → 55-74
-
-Contradicted:
-  - Multiple trusted sources contradict (directly or logically) → 90-100
-  - One trusted source contradicts (directly or logically) → 75-89
-  - Only lower-credibility sources contradict → 55-74
-
-Unverified:
-  - No sources supplied at all → 0-20
-  - Sources exist but are weak or unrelated → 20-50
-
-Keep reasoning to 1-3 sentences. State which source led to your verdict (by title or publisher).
-Respond ONLY with valid JSON, no other text:
-{ "verdict": "Supported" | "Contradicted" | "Unverified", "confidence": 80, "reasoning": "..." }`;
+  const language = normalizeLanguage(responseLanguage);
+  const system = buildVerdictPrompt(language);
 
   try {
     const raw = await callMistral(
@@ -214,15 +154,11 @@ Respond ONLY with valid JSON, no other text:
   }
 };
 
-export const detectAIContent = async (text) => {
+export const detectAIContent = async (text, responseLanguage = "en") => {
   if (!text?.trim()) throw new Error("Text is required");
 
-  const system = `Analyze text for patterns associated with AI-generated writing.
-Look for: repetitiveness, generic/vague language, uniform sentence structure, formulaic transitions, lack of personal voice.
-Note: this is a heuristic estimate, not definitive.
-Respond ONLY with valid JSON, no other text:
-{ "aiLikelihood": 75, "reasoning": "short plain-English explanation" }
-aiLikelihood must be an integer 0-100. 0 = very likely human, 100 = very likely AI.`;
+  const language = normalizeLanguage(responseLanguage);
+  const system = buildAIDetectionPrompt(language);
 
   try {
     const raw = await callMistral(system, text, "detectAIContent");

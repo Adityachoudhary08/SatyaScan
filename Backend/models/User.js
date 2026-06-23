@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: true,
     },
+    preferredLanguage: {
+      type: String,
+      default: "auto",
+      enum: ["auto", "en", "hi", "pa", "bn", "ta", "te", "mr", "gu", "ur"],
+      description: "User's preferred language for responses",
+    },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
