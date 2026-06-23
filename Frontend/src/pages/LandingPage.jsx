@@ -1,14 +1,13 @@
 import { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, useInView } from 'framer-motion';
-import { useTheme } from '../context/ThemeContext';
+import { useTranslation, useLanguage } from '../context/LanguageContext';
 
 // ── Animation variants ────────────────────────────────────────────────────────
 const fadeUp = {
   hidden: { opacity: 0, y: 32 },
   visible: (i = 0) => ({
-    opacity: 1,
-    y: 0,
+    opacity: 1, y: 0,
     transition: { duration: 0.6, delay: i * 0.1, ease: 'easeOut' },
   }),
 };
@@ -24,8 +23,7 @@ const fadeIn = {
 const scaleIn = {
   hidden: { opacity: 0, scale: 0.88 },
   visible: (i = 0) => ({
-    opacity: 1,
-    scale: 1,
+    opacity: 1, scale: 1,
     transition: { duration: 0.5, delay: i * 0.12, ease: 'easeOut' },
   }),
 };
@@ -35,59 +33,42 @@ function AnimatedSection({ children, className = '' }) {
   const ref = useRef(null);
   const inView = useInView(ref, { once: true, margin: '-80px' });
   return (
-    <motion.div
-      ref={ref}
-      initial="hidden"
-      animate={inView ? 'visible' : 'hidden'}
-      className={className}
-    >
+    <motion.div ref={ref} initial="hidden" animate={inView ? 'visible' : 'hidden'} className={className}>
       {children}
     </motion.div>
   );
 }
 
-// ── Stats counter ─────────────────────────────────────────────────────────────
-const STATS = [
-  { value: '1M+', label: 'Claims Verified', color: 'from-blue-400 to-cyan-400' },
-  { value: '50k+', label: 'Trusted Sources', color: 'from-emerald-400 to-green-400' },
-  { value: '<2s', label: 'Analysis Speed', color: 'from-amber-400 to-yellow-400' },
-];
+// Inline shield logo with teal
+function ShieldLogo({ size = 32 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none">
+      <defs>
+        <linearGradient id="slgLanding" x1="0" y1="0" x2="100" y2="100" gradientUnits="userSpaceOnUse">
+          <stop offset="0%" stopColor="#14B8A6" />
+          <stop offset="100%" stopColor="#5eead4" />
+        </linearGradient>
+      </defs>
+      <path d="M50 6 L88 22 L88 54 C88 72 70 88 50 95 C30 88 12 72 12 54 L12 22 Z"
+        fill="url(#slgLanding)" opacity="0.15" stroke="url(#slgLanding)" strokeWidth="2.5" />
+      <text x="50" y="66" textAnchor="middle" fontSize="44" fontWeight="800"
+        fontFamily="Inter,Arial,sans-serif" fill="url(#slgLanding)">S</text>
+    </svg>
+  );
+}
 
-// ── Feature cards ──────────────────────────────────────────────────────────────
-const FEATURES = [
-  {
-    icon: '🔍',
-    title: 'Advanced Fact Checking',
-    desc: 'Real-time cross-referencing against global databases, scholarly journals, and official government records using natural language understanding.',
-  },
-  {
-    icon: '🤖',
-    title: 'AI Content Detection',
-    desc: 'Identify LLM-generated text, synthetic audio, and deepfake imagery with 99.4% precision.',
-  },
-  {
-    icon: '✅',
-    title: 'Source Credibility',
-    desc: 'Algorithmic scoring of domains and authors based on historical accuracy and bias metrics.',
-  },
-  {
-    icon: '🌐',
-    title: 'Multi-language Support',
-    desc: 'Analyze content in 120+ languages with contextual nuance and automatic translation.',
-  },
-];
-
-// ── HOW IT WORKS steps ────────────────────────────────────────────────────────
-const STEPS = [
-  { step: '01', title: 'Input Content', desc: 'Paste text, drop a URL, or upload an image.' },
-  { step: '02', title: 'AI Analysis', desc: 'Mistral AI extracts claims and detects AI patterns.' },
-  { step: '03', title: 'Source Verification', desc: 'Claims cross-checked against 50k+ trusted sources.' },
-  { step: '04', title: 'Trust Score', desc: 'Receive a confidence-weighted verdict in under 2 seconds.' },
+const FEATURE_ICONS = ['🔍', '🤖', '✅', '🌐'];
+const STEP_NUMS = ['01', '02', '03', '04'];
+const STATS_DATA = [
+  { value: '1M+', key: 'claims', color: 'from-[#14B8A6] to-[#5eead4]' },
+  { value: '50k+', key: 'sources', color: 'from-emerald-400 to-green-400' },
+  { value: '<2s', key: 'speed', color: 'from-amber-400 to-yellow-400' },
 ];
 
 export default function LandingPage() {
   const navigate = useNavigate();
-  const { dark, toggle } = useTheme();
+  const { t } = useTranslation();
+  const { uiLang, setUiLang } = useLanguage();
   const [searchValue, setSearchValue] = useState('');
 
   const handleSearchSubmit = (e) => {
@@ -97,30 +78,29 @@ export default function LandingPage() {
 
   const goAnalyze = () => navigate('/analyze');
 
-  const th = {
-    bg: dark ? 'bg-[#030712]' : 'bg-slate-50',
-    text: dark ? 'text-white' : 'text-gray-900',
-    sub: dark ? 'text-gray-400' : 'text-gray-600',
-    card: dark ? 'bg-gray-900/60 border-gray-700/60' : 'bg-white border-gray-200',
-    cardHover: dark ? 'hover:border-blue-500/50 hover:bg-gray-900' : 'hover:border-blue-400 hover:bg-blue-50/40',
-    nav: dark ? 'bg-[#030712]/90 border-gray-800' : 'bg-white/90 border-gray-200',
-    statCard: dark ? 'bg-gray-900/50 border-gray-800' : 'bg-white border-gray-200',
-    input: dark
-      ? 'bg-gray-900 border-gray-700 text-white placeholder-gray-500 focus:border-blue-500'
-      : 'bg-white border-gray-300 text-gray-900 placeholder-gray-400 focus:border-blue-500',
-    badge: dark ? 'bg-gray-800 border-gray-700 text-gray-400' : 'bg-gray-100 border-gray-300 text-gray-600',
-    cta: dark ? 'bg-gray-900 border-gray-700' : 'bg-gray-900 border-gray-700',
-    stepCard: dark ? 'bg-gray-900/40 border-gray-800' : 'bg-white border-gray-200',
-  };
+  const FEATURES = [
+    { icon: FEATURE_ICONS[0], title: t('landing.features.f1Title'), desc: t('landing.features.f1Desc') },
+    { icon: FEATURE_ICONS[1], title: t('landing.features.f2Title'), desc: t('landing.features.f2Desc') },
+    { icon: FEATURE_ICONS[2], title: t('landing.features.f3Title'), desc: t('landing.features.f3Desc') },
+    { icon: FEATURE_ICONS[3], title: t('landing.features.f4Title'), desc: t('landing.features.f4Desc') },
+  ];
+
+  const STEPS = [
+    { step: STEP_NUMS[0], title: t('landing.steps.s1Title'), desc: t('landing.steps.s1Desc') },
+    { step: STEP_NUMS[1], title: t('landing.steps.s2Title'), desc: t('landing.steps.s2Desc') },
+    { step: STEP_NUMS[2], title: t('landing.steps.s3Title'), desc: t('landing.steps.s3Desc') },
+    { step: STEP_NUMS[3], title: t('landing.steps.s4Title'), desc: t('landing.steps.s4Desc') },
+  ];
 
   return (
-    <div className={`min-h-screen ${th.bg} ${th.text} transition-colors duration-300`}>
+    <div className="min-h-screen bg-[#0B0B0B] text-white">
 
       {/* ── Navbar ── */}
-      <nav className={`fixed top-0 left-0 right-0 z-50 ${th.nav} border-b backdrop-blur-md px-6 py-3 flex items-center justify-between transition-colors duration-300`}>
+      <nav className="nav-blur fixed top-0 left-0 right-0 z-50 px-6 py-3 flex items-center justify-between">
         <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ duration: 0.4 }}>
-          <span className={`font-bold text-xl tracking-tight cursor-pointer ${th.text}`} onClick={() => navigate('/')}>
-            <span className="text-blue-500">Satya</span>Scan
+          <span className="font-bold text-xl tracking-tight cursor-pointer flex items-center gap-2.5" onClick={() => navigate('/')}>
+            <ShieldLogo size={26} />
+            <span><span className="text-[#14B8A6]">Satya</span>Scan</span>
           </span>
         </motion.div>
 
@@ -130,44 +110,43 @@ export default function LandingPage() {
           {/* Search bar → goes to /analyze */}
           <form onSubmit={handleSearchSubmit} className="hidden sm:flex items-center">
             <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[#D1D5DB]/40 text-sm">🔍</span>
               <input
                 value={searchValue}
                 onChange={(e) => setSearchValue(e.target.value)}
                 onFocus={() => navigate('/analyze')}
                 type="text"
-                placeholder="Scan URL or text..."
-                className={`pl-9 pr-4 py-1.5 rounded-lg border text-sm w-52 outline-none transition-all duration-200 ${th.input}`}
+                placeholder={t('landing.searchPlaceholder')}
+                className="pl-9 pr-4 py-1.5 rounded-lg border border-[#2A2A2A] bg-[#1A1A1A] text-white placeholder-[#D1D5DB]/30 text-sm w-52 outline-none focus:border-[#14B8A6] transition-colors"
               />
             </div>
           </form>
 
-          {/* Theme toggle */}
+          {/* UI Language toggle */}
           <button
-            onClick={toggle}
-            className={`w-8 h-8 rounded-full flex items-center justify-center border transition-colors ${th.badge}`}
-            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+            onClick={() => setUiLang(uiLang === 'en' ? 'hi' : 'en')}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#2A2A2A] text-[#D1D5DB] hover:border-[#14B8A6] hover:text-[#14B8A6] transition-colors text-xs font-bold"
           >
-            {dark ? '☀️' : '🌙'}
+            {uiLang === 'en' ? '🇮🇳 HI' : '🇬🇧 EN'}
           </button>
 
           <button
             onClick={goAnalyze}
-            className="bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold px-4 py-1.5 rounded-lg transition-colors"
+            className="ss-btn-primary text-sm px-4 py-1.5"
           >
-            Analyze →
+            {t('landing.hero.cta')} →
           </button>
         </motion.div>
       </nav>
 
       {/* ── Hero ── */}
-      <section className="pt-32 pb-20 px-6 max-w-6xl mx-auto">
+      <section className="hero-gradient grid-pattern pt-32 pb-20 px-6 max-w-6xl mx-auto relative">
         <div className="flex flex-col lg:flex-row items-center gap-12">
           <div className="flex-1 text-center lg:text-left">
             <motion.div variants={fadeIn} initial="hidden" animate="visible" custom={0}>
-              <span className={`inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest px-3 py-1.5 rounded-full border ${th.badge} mb-6`}>
-                <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
-                Next-Gen Truth Engine
+              <span className="ss-badge mb-6 inline-flex">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#14B8A6] accent-pulse" />
+                {t('landing.badge')}
               </span>
             </motion.div>
 
@@ -175,18 +154,17 @@ export default function LandingPage() {
               variants={fadeUp} initial="hidden" animate="visible" custom={1}
               className="text-5xl sm:text-6xl lg:text-7xl font-extrabold leading-tight mb-6"
             >
-              Verify Information
-              <span className="block text-transparent bg-clip-text bg-gradient-to-r from-blue-400 via-cyan-400 to-blue-600">
-                Before You Share It
+              {t('landing.hero.title1')}
+              <span className="block gradient-text">
+                {t('landing.hero.title2')}
               </span>
             </motion.h1>
 
             <motion.p
               variants={fadeUp} initial="hidden" animate="visible" custom={2}
-              className={`text-lg ${th.sub} mb-8 max-w-lg mx-auto lg:mx-0`}
+              className="text-lg text-[#D1D5DB] mb-8 max-w-lg mx-auto lg:mx-0"
             >
-              Combat deepfakes and misinformation with high-fidelity AI detection.
-              SatyaScan cross-references 50k+ sources in milliseconds to ensure digital integrity.
+              {t('landing.hero.subtitle')}
             </motion.p>
 
             <motion.div
@@ -196,26 +174,26 @@ export default function LandingPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                 onClick={goAnalyze}
-                className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3 rounded-xl flex items-center gap-2 transition-colors shadow-lg shadow-blue-500/20"
+                className="ss-btn-primary px-8 py-3 text-sm shadow-lg shadow-[#14B8A6]/20"
               >
-                Analyze Content →
+                {t('landing.hero.cta')} →
               </motion.button>
               <motion.button
                 whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
                 onClick={goAnalyze}
-                className={`border font-semibold px-8 py-3 rounded-xl transition-colors ${dark ? 'border-gray-600 text-gray-300 hover:border-gray-400 hover:text-white' : 'border-gray-400 text-gray-700 hover:border-gray-600 hover:text-gray-900'}`}
+                className="ss-btn-secondary px-8 py-3 text-sm"
               >
-                Get Started for Free
+                {t('landing.hero.ctaSecondary')}
               </motion.button>
             </motion.div>
 
             <motion.div
               variants={fadeUp} initial="hidden" animate="visible" custom={4}
-              className="flex gap-6 mt-8 justify-center lg:justify-start"
+              className="flex gap-6 mt-8 justify-center lg:justify-start flex-wrap"
             >
-              {['SOC2 Compliant', 'E2E Encrypted', 'GDPR Ready'].map((tag) => (
-                <span key={tag} className={`text-xs flex items-center gap-1.5 ${th.sub}`}>
-                  <span className="text-green-400">✓</span> {tag}
+              {[t('landing.trust.soc2'), t('landing.trust.encrypted'), t('landing.trust.gdpr')].map((tag) => (
+                <span key={tag} className="text-xs flex items-center gap-1.5 text-[#D1D5DB]">
+                  <span className="text-[#14B8A6]">✓</span> {tag}
                 </span>
               ))}
             </motion.div>
@@ -231,35 +209,35 @@ export default function LandingPage() {
               {/* Floating verified card */}
               <motion.div
                 animate={{ y: [0, -8, 0] }} transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
-                className={`absolute -top-4 right-0 flex items-center gap-3 px-4 py-3 rounded-xl border ${th.card} shadow-xl`}
+                className="absolute -top-4 right-0 flex items-center gap-3 px-4 py-3 rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] shadow-xl"
               >
-                <span className="text-green-400 text-xl">✅</span>
+                <span className="text-[#14B8A6] text-xl">✅</span>
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Source Verified</p>
+                  <p className="text-xs text-[#D1D5DB]/60 uppercase tracking-wider">{t('landing.verified')}</p>
                   <p className="text-sm font-bold text-white">BBC News API</p>
                 </div>
               </motion.div>
 
               {/* Main card */}
-              <div className={`mt-12 rounded-2xl border ${th.card} p-6 backdrop-blur-sm shadow-2xl`}>
+              <div className="mt-12 rounded-2xl border border-[#2A2A2A] bg-[#1A1A1A] p-6 shadow-2xl">
                 <div className="flex items-center gap-2 mb-4">
                   <span className="w-3 h-3 rounded-full bg-red-500" />
                   <span className="w-3 h-3 rounded-full bg-yellow-500" />
                   <span className="w-3 h-3 rounded-full bg-green-500" />
-                  <span className={`ml-auto text-xs ${th.sub}`}>Analysis in progress…</span>
+                  <span className="ml-auto text-xs text-[#D1D5DB]/50">{t('landing.analysisProgress')}…</span>
                 </div>
                 <div className="space-y-3">
                   {[
-                    { label: 'Claim Extraction', status: '✓', color: 'bg-green-500', w: 'w-full' },
-                    { label: 'Source Matching', status: '✓', color: 'bg-green-500', w: 'w-4/5' },
-                    { label: 'AI Detection', status: '…', color: 'bg-blue-500', w: 'w-3/5' },
+                    { label: t('landing.claimExtraction'), status: '✓', color: 'bg-[#14B8A6]', w: 'w-full' },
+                    { label: t('landing.sourceMatching'), status: '✓', color: 'bg-[#14B8A6]', w: 'w-4/5' },
+                    { label: t('landing.aiDetection'), status: '…', color: 'bg-[#5eead4]', w: 'w-3/5' },
                   ].map((item) => (
                     <div key={item.label}>
                       <div className="flex justify-between text-xs mb-1">
-                        <span className={th.sub}>{item.label}</span>
-                        <span className={item.status === '✓' ? 'text-green-400' : 'text-blue-400'}>{item.status}</span>
+                        <span className="text-[#D1D5DB]/60">{item.label}</span>
+                        <span className="text-[#14B8A6]">{item.status}</span>
                       </div>
-                      <div className={`h-1.5 rounded-full ${dark ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                      <div className="h-1.5 rounded-full bg-[#2A2A2A]">
                         <motion.div
                           className={`h-1.5 rounded-full ${item.color}`}
                           initial={{ width: 0 }} animate={{ width: item.w }}
@@ -274,12 +252,12 @@ export default function LandingPage() {
               {/* Floating AI confidence card */}
               <motion.div
                 animate={{ y: [0, 8, 0] }} transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-                className={`absolute -bottom-4 left-0 flex items-center gap-3 px-4 py-3 rounded-xl border ${th.card} shadow-xl`}
+                className="absolute -bottom-4 left-0 flex items-center gap-3 px-4 py-3 rounded-xl border border-[#2A2A2A] bg-[#1A1A1A] shadow-xl"
               >
-                <span className="text-blue-400 text-xl">🤖</span>
+                <span className="text-[#5eead4] text-xl">🤖</span>
                 <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">AI Confidence</p>
-                  <p className="text-sm font-bold text-white">99.8% Genuine</p>
+                  <p className="text-xs text-[#D1D5DB]/60 uppercase tracking-wider">{t('landing.aiConfidence')}</p>
+                  <p className="text-sm font-bold text-white">99.8% {t('landing.genuine')}</p>
                 </div>
               </motion.div>
             </motion.div>
@@ -288,17 +266,17 @@ export default function LandingPage() {
       </section>
 
       {/* ── Stats ── */}
-      <AnimatedSection className="py-12 px-6 max-w-4xl mx-auto">
+      <AnimatedSection className="py-16 px-6 max-w-4xl mx-auto">
         <div className="grid grid-cols-3 gap-4">
-          {STATS.map((s, i) => (
+          {STATS_DATA.map((s, i) => (
             <motion.div
-              key={s.label} variants={scaleIn} custom={i}
-              className={`${th.statCard} border rounded-xl p-6 text-center`}
+              key={s.key} variants={scaleIn} custom={i}
+              className="ss-card text-center py-8"
             >
-              <p className={`text-4xl font-extrabold bg-gradient-to-r ${s.color} bg-clip-text text-transparent mb-1`}>
+              <p className={`text-4xl font-extrabold bg-gradient-to-r ${s.color} bg-clip-text text-transparent mb-2`}>
                 {s.value}
               </p>
-              <p className={`text-xs uppercase tracking-widest ${th.sub}`}>{s.label}</p>
+              <p className="text-xs uppercase tracking-widest text-[#D1D5DB]">{t(`landing.stats.${s.key}`)}</p>
             </motion.div>
           ))}
         </div>
@@ -307,25 +285,23 @@ export default function LandingPage() {
       {/* ── Features ── */}
       <AnimatedSection className="py-20 px-6 max-w-6xl mx-auto">
         <motion.div variants={fadeUp} className="text-center mb-12">
-          <h2 className={`text-4xl font-extrabold mb-3 ${th.text}`}>
-            Precision-Engineered{' '}
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-400">Detection</span>
+          <h2 className="text-4xl font-extrabold mb-3">
+            {t('landing.features.title')}{' '}
+            <span className="gradient-text">{t('landing.features.titleAccent')}</span>
           </h2>
-          <p className={`${th.sub} max-w-xl mx-auto`}>
-            Our multi-layered analysis protocol identifies discrepancies that the human eye and traditional filters miss.
-          </p>
+          <p className="text-[#D1D5DB] max-w-xl mx-auto">{t('landing.features.subtitle')}</p>
         </motion.div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
           {FEATURES.map((f, i) => (
             <motion.div
               key={f.title} variants={scaleIn} custom={i}
-              whileHover={{ y: -4 }}
-              className={`${th.card} ${th.cardHover} border rounded-2xl p-6 cursor-pointer transition-all duration-200`}
+              whileHover={{ y: -4, borderColor: 'rgba(20,184,166,0.4)' }}
+              className="ss-card cursor-pointer transition-all duration-200"
             >
               <span className="text-3xl mb-4 block">{f.icon}</span>
-              <h3 className={`text-lg font-bold mb-2 ${th.text}`}>{f.title}</h3>
-              <p className={`text-sm leading-relaxed ${th.sub}`}>{f.desc}</p>
+              <h3 className="text-lg font-bold mb-2 text-white">{f.title}</h3>
+              <p className="text-sm leading-relaxed text-[#D1D5DB]">{f.desc}</p>
             </motion.div>
           ))}
         </div>
@@ -334,20 +310,20 @@ export default function LandingPage() {
       {/* ── How It Works ── */}
       <AnimatedSection className="py-20 px-6 max-w-5xl mx-auto">
         <motion.div variants={fadeUp} className="text-center mb-12">
-          <h2 className={`text-4xl font-extrabold mb-3 ${th.text}`}>How It Works</h2>
-          <p className={`${th.sub}`}>Four steps from input to verified truth.</p>
+          <h2 className="text-4xl font-extrabold mb-3">{t('landing.steps.title')}</h2>
+          <p className="text-[#D1D5DB]">{t('landing.steps.subtitle')}</p>
         </motion.div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           {STEPS.map((s, i) => (
             <motion.div
               key={s.step} variants={fadeUp} custom={i}
-              className={`${th.stepCard} border rounded-2xl p-5 relative`}
+              className="ss-card relative"
             >
-              <p className="text-4xl font-black text-blue-500/20 mb-3">{s.step}</p>
-              <h3 className={`font-bold text-base mb-1 ${th.text}`}>{s.title}</h3>
-              <p className={`text-sm ${th.sub}`}>{s.desc}</p>
+              <p className="text-4xl font-black text-[#14B8A6]/20 mb-3">{s.step}</p>
+              <h3 className="font-bold text-base mb-1 text-white">{s.title}</h3>
+              <p className="text-sm text-[#D1D5DB]">{s.desc}</p>
               {i < STEPS.length - 1 && (
-                <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 text-gray-600 text-xl z-10">→</div>
+                <div className="hidden lg:block absolute -right-3 top-1/2 -translate-y-1/2 text-[#14B8A6]/50 text-xl z-10">→</div>
               )}
             </motion.div>
           ))}
@@ -358,45 +334,49 @@ export default function LandingPage() {
       <AnimatedSection className="py-20 px-6">
         <motion.div
           variants={scaleIn}
-          className="max-w-2xl mx-auto text-center bg-gradient-to-br from-gray-900 via-blue-950/40 to-gray-900 border border-blue-500/20 rounded-3xl p-12 shadow-2xl"
+          className="max-w-2xl mx-auto text-center bg-[#1A1A1A] border border-[#14B8A6]/20 rounded-3xl p-12 shadow-2xl"
+          style={{ boxShadow: '0 0 60px rgba(20,184,166,0.08)' }}
         >
           <h2 className="text-4xl font-extrabold text-white mb-4">
-            Ready to secure the truth?
+            {t('landing.cta.title')}
           </h2>
-          <p className="text-gray-400 mb-8">
-            Join thousands of researchers and organizations relying on SatyaScan for digital verification.
-          </p>
+          <p className="text-[#D1D5DB] mb-8">{t('landing.cta.subtitle')}</p>
           <div className="flex gap-4 justify-center flex-wrap">
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
               onClick={goAnalyze}
-              className="bg-blue-600 hover:bg-blue-500 text-white font-semibold px-8 py-3 rounded-xl transition-colors shadow-lg shadow-blue-500/20"
+              className="ss-btn-primary px-8 py-3 shadow-lg shadow-[#14B8A6]/20"
             >
-              Get Started for Free
+              {t('landing.cta.primary')}
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}
               onClick={goAnalyze}
-              className="border border-gray-600 hover:border-gray-400 text-gray-300 hover:text-white font-semibold px-8 py-3 rounded-xl transition-colors"
+              className="ss-btn-secondary px-8 py-3"
             >
-              Contact Sales
+              {t('landing.cta.secondary')}
             </motion.button>
           </div>
         </motion.div>
       </AnimatedSection>
 
       {/* ── Footer ── */}
-      <footer className={`border-t ${dark ? 'border-gray-800' : 'border-gray-200'} px-6 py-8`}>
+      <footer className="border-t border-[#2A2A2A] px-6 py-8">
         <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
             <p className="font-bold text-lg">
-              <span className="text-blue-500">Satya</span>Scan
+              <span className="text-[#14B8A6]">Satya</span>Scan
             </p>
-            <p className={`text-xs ${th.sub}`}>© 2024 SatyaScan AI. All rights reserved.</p>
+            <p className="text-xs text-[#D1D5DB]/50">{t('landing.footer.rights')}</p>
           </div>
-          <div className={`flex gap-6 text-sm ${th.sub}`}>
-            {['About', 'Features', 'GitHub', 'Contact'].map((l) => (
-              <a key={l} href="#" className="hover:text-blue-400 transition-colors">{l}</a>
+          <div className="flex gap-6 text-sm text-[#D1D5DB]/60">
+            {[
+              t('landing.footer.about'),
+              t('landing.footer.features'),
+              t('landing.footer.github'),
+              t('landing.footer.contact'),
+            ].map((l) => (
+              <a key={l} href="#" className="hover:text-[#14B8A6] transition-colors">{l}</a>
             ))}
           </div>
         </div>
