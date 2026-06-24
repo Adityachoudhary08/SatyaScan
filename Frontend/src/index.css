@@ -25,6 +25,13 @@
 
 html {
   scroll-behavior: smooth;
+  /* Smooth momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Smooth scroll container feel */
+body {
+  scroll-behavior: smooth;
 }
 
 body {
@@ -212,3 +219,181 @@ body {
 .ss-transition {
   transition: all 0.2s ease;
 }
+
+/* ── Smooth Scroll Latency Feel ──────────────────────────────────────────────── */
+/* GPU-promote fixed navbars so the slide animation is compositor-driven */
+.nav-blur {
+  will-change: transform;
+}
+
+/* Link & button tap ripple */
+a, button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Scrollbar gutter reservation to prevent layout shift */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Smooth anchor links */
+* {
+  scroll-margin-top: 80px;
+}
+
+/* Page-level transition feel — subtle fade on route change */
+@keyframes pageFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.page-enter {
+  animation: pageFadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+/* ── Shimmer sweep for buttons ──────────────────────────────────────────────── */
+@keyframes shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--color-accent) 0%,
+    var(--color-accent-light) 25%,
+    var(--color-accent) 50%,
+    var(--color-accent-light) 75%,
+    var(--color-accent) 100%
+  );
+  background-size: 200% 100%;
+  transition: box-shadow 0.3s ease, transform 0.15s ease;
+}
+
+.shimmer-btn:hover {
+  animation: shimmer 2s linear infinite;
+  box-shadow: 0 0 30px rgba(20, 184, 166, 0.4), 0 0 60px rgba(20, 184, 166, 0.15);
+}
+
+/* ── Floating orb animation ─────────────────────────────────────────────────── */
+@keyframes floatOrb {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(12px, -18px) scale(1.05); }
+  50% { transform: translate(-8px, -30px) scale(0.95); }
+  75% { transform: translate(-16px, -12px) scale(1.02); }
+}
+
+.floating-orb {
+  animation: floatOrb 8s ease-in-out infinite;
+  will-change: transform;
+}
+
+.floating-orb-slow {
+  animation: floatOrb 12s ease-in-out infinite;
+  animation-delay: -3s;
+  will-change: transform;
+}
+
+.floating-orb-fast {
+  animation: floatOrb 6s ease-in-out infinite;
+  animation-delay: -5s;
+  will-change: transform;
+}
+
+/* ── Glow pulse border ──────────────────────────────────────────────────────── */
+@keyframes glowPulse {
+  0%, 100% { box-shadow: 0 0 20px rgba(20, 184, 166, 0.08), inset 0 1px 0 rgba(255,255,255,0.04); }
+  50% { box-shadow: 0 0 40px rgba(20, 184, 166, 0.18), 0 0 80px rgba(20, 184, 166, 0.06), inset 0 1px 0 rgba(255,255,255,0.06); }
+}
+
+/* ── Glassmorphism card ─────────────────────────────────────────────────────── */
+.glass-card {
+  background: rgba(26, 26, 26, 0.6);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 1.5rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.glass-card-glow {
+  animation: glowPulse 4s ease-in-out infinite;
+}
+
+/* ── Enhanced input focus ───────────────────────────────────────────────────── */
+.ss-input-animated {
+  width: 100%;
+  background-color: rgba(11, 11, 11, 0.8);
+  border: 1px solid rgba(42, 42, 42, 0.8);
+  color: var(--color-text-primary);
+  border-radius: 0.75rem;
+  padding: 0.875rem 1rem;
+  font-size: 0.875rem;
+  outline: none;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+  font-family: var(--font-family);
+}
+
+.ss-input-animated:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.12), 0 0 20px rgba(20, 184, 166, 0.08);
+  background-color: rgba(11, 11, 11, 1);
+}
+
+.ss-input-animated::placeholder {
+  color: #555;
+  transition: color 0.2s ease;
+}
+
+.ss-input-animated:focus::placeholder {
+  color: #666;
+}
+
+/* ── Rotating trust ring ────────────────────────────────────────────────────── */
+@keyframes rotateSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.rotate-slow {
+  animation: rotateSlow 30s linear infinite;
+}
+
+/* ── Gradient morph blob ────────────────────────────────────────────────────── */
+@keyframes morphBlob {
+  0%, 100% { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; }
+  25% { border-radius: 30% 60% 70% 40% / 50% 60% 30% 60%; }
+  50% { border-radius: 50% 60% 30% 60% / 30% 60% 70% 40%; }
+  75% { border-radius: 60% 40% 60% 30% / 70% 30% 50% 60%; }
+}
+
+.morph-blob {
+  animation: morphBlob 10s ease-in-out infinite;
+  will-change: border-radius;
+}
+
+/* ── Connected timeline line draw ───────────────────────────────────────────── */
+@keyframes drawLine {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* ── 3D tilt hover for cards ────────────────────────────────────────────────── */
+.tilt-card {
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.4s ease;
+}
+
+.tilt-card:hover {
+  box-shadow: 0 20px 60px rgba(20, 184, 166, 0.12), 0 0 40px rgba(20, 184, 166, 0.06);
+}
+
+/* ── Password strength bar colors ───────────────────────────────────────────── */
+.strength-weak { background: linear-gradient(90deg, #ef4444, #f97316); }
+.strength-fair { background: linear-gradient(90deg, #f97316, #eab308); }
+.strength-good { background: linear-gradient(90deg, #eab308, #22c55e); }
+.strength-strong { background: linear-gradient(90deg, #14B8A6, #5eead4); }
+

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTranslation, useLanguage } from '../context/LanguageContext';
@@ -46,6 +46,20 @@ export default function Navbar() {
   const { selectedLanguage, setSelectedLanguage } = useLanguage();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [visible, setVisible] = useState(true);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    const onScroll = () => {
+      const currentY = window.scrollY;
+      setScrolled(currentY > 20);
+      setVisible(currentY < lastY || currentY < 20);
+      lastY = currentY;
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -58,7 +72,15 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="nav-blur sticky top-0 z-50 px-6 py-3">
+    <nav
+      className="nav-blur fixed top-0 left-0 right-0 z-50 px-6 py-3"
+      style={{
+        transform: visible ? 'translateY(0)' : 'translateY(-100%)',
+        transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, border-color 0.3s ease',
+        borderBottom: `1px solid ${scrolled ? 'rgba(20,184,166,0.15)' : 'rgba(42,42,42,0.6)'}`,
+        boxShadow: scrolled ? '0 4px 32px rgba(0,0,0,0.4)' : 'none',
+      }}
+    >
       <div className="max-w-6xl mx-auto flex items-center justify-between">
         {/* Logo */}
         <Link to="/" className="flex items-center gap-2.5 group">
