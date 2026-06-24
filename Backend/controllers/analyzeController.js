@@ -13,6 +13,10 @@ import {
   getDomainCredibility,
 } from "../utils/scoring.js";
 import { generateHash, getFromCache, setCache } from "../utils/cache.js";
+import {
+  normalizeLanguage,
+  getResponseLanguage,
+} from "../utils/languageUtils.js";
 
 const ANALYSIS_TIMEOUT_MS = 60_000;
 const DEFAULT_SOURCE_CREDIBILITY = 60;
@@ -72,6 +76,7 @@ const resolveInputText = async (type, content, file) => {
 const runAnalysis = async (req) => {
   const type = req.body.type;
   const content = req.body.content;
+  const selectedLanguage = normalizeLanguage(req.body.selectedLanguage || "auto");
   const inputUrl = type === "url" ? content?.trim() : null;
 
   const rawText = await resolveInputText(type, content, req.file);
@@ -102,18 +107,25 @@ const runAnalysis = async (req) => {
   // Track whether real AI analysis succeeded or fell back to defaults
   let apiWorking = true;
 
-  const { language, translatedText } = await safeStep(
+  // Detect language
+  const { language: detectedLanguage, translatedText } = await safeStep(
     "detectAndTranslate",
     () => detectAndTranslate(rawText),
     { language: "unknown", translatedText: rawText }
   );
+
+  // Normalize detected language
+  const normalizedDetected = normalizeLanguage(detectedLanguage);
+
+  // Determine response language
+  const responseLanguage = getResponseLanguage(selectedLanguage, normalizedDetected);
 
   // Skip claim extraction entirely for garbled OCR (pure visual images)
   const extractedClaims = isGarbledOcr
     ? []
     : await safeStep(
         "extractClaims",
-        () => extractClaims(translatedText),
+        () => extractClaims(translatedText, responseLanguage),
         []
       );
 
@@ -130,7 +142,7 @@ const runAnalysis = async (req) => {
       const claimText = item.claim;
       return safeStep(
         `verifyClaim("${claimText}")`,
-        () => verifyClaim(claimText),
+        () => verifyClaim(claimText, responseLanguage),
         {
           claim: claimText,
           verdict: "Unverified",
@@ -149,7 +161,7 @@ const runAnalysis = async (req) => {
 
   const aiResult = await safeStep(
     "detectAIContent",
-    () => detectAIContent(aiDetectionText),
+    () => detectAIContent(aiDetectionText, responseLanguage),
     null
   );
 
@@ -207,7 +219,9 @@ const runAnalysis = async (req) => {
       userId: req.user?._id ?? null,
       inputType: type,
       originalText: rawText,
-      language,
+      language: normalizedDetected,
+      detectedLanguage: normalizedDetected,
+      responseLanguage,
       claims: verifiedClaims.map(({ claim, verdict, sources }) => ({
         text: claim,
         verdict,
@@ -225,7 +239,9 @@ const runAnalysis = async (req) => {
 
   return {
     inputType: type,
-    language,
+    detectedLanguage: normalizedDetected,
+    responseLanguage,
+    language: normalizedDetected,
     claims: claimsForResponse,
     aiLikelihood,
     aiReasoning,
@@ -247,9 +263,10 @@ export const analyze = async (req, res) => {
       });
     }
 
-    // Generate cache key based on input content
+    // Generate cache key based on input content + language preference
     const content = req.body.content || "";
-    const cacheKey = generateHash(`${type}:${content}`);
+    const selectedLanguage = normalizeLanguage(req.body.selectedLanguage || "auto");
+    const cacheKey = generateHash(`${type}:${content}:${selectedLanguage}`);
 
     // Check cache first
     const cachedResult = getFromCache(cacheKey);

@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import { getReportPdfUrl } from '../api/api';
+import { useTranslation } from '../context/LanguageContext';
 
 export default function ShareModal({ checkId, onClose }) {
+  const { t } = useTranslation();
   const shareUrl = `${window.location.origin}/report/${checkId}`;
   const pdfUrl = getReportPdfUrl(checkId);
   const [copied, setCopied] = useState(false);
@@ -14,28 +16,35 @@ export default function ShareModal({ checkId, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 px-4">
-      <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 w-full max-w-md shadow-2xl">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-white font-semibold text-lg">Share / Export Report</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-white text-xl leading-none">×</button>
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 px-4">
+      <div className="bg-[#1A1A1A] border border-[#2A2A2A] rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-white font-bold text-lg">{t('share.title')}</h2>
+          <button
+            onClick={onClose}
+            className="text-[#D1D5DB] hover:text-white text-2xl leading-none transition-colors w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5"
+          >
+            ×
+          </button>
         </div>
 
         {/* Shareable link */}
         <div className="mb-4">
-          <label className="text-xs text-gray-400 block mb-1">Shareable Link</label>
+          <label className="ss-label mb-2">{t('results.publicReport')}</label>
           <div className="flex gap-2">
             <input
               readOnly
               value={shareUrl}
-              className="flex-1 bg-gray-800 border border-gray-600 text-gray-300 text-sm rounded px-3 py-2 focus:outline-none"
+              className="flex-1 bg-[#0B0B0B] border border-[#2A2A2A] text-[#D1D5DB] text-xs rounded-lg px-3 py-2.5 focus:outline-none font-mono"
             />
             <button
               onClick={handleCopy}
-              className={`shrink-0 px-4 py-2 rounded text-sm font-medium transition
-                ${copied ? 'bg-green-700 text-white' : 'bg-blue-700 hover:bg-blue-600 text-white'}`}
+              className={`shrink-0 px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200
+                ${copied
+                  ? 'bg-green-600 text-white'
+                  : 'ss-btn-primary text-xs'}`}
             >
-              {copied ? '✓ Copied!' : 'Copy'}
+              {copied ? `✓ ${t('share.copied')}` : t('share.copyLink')}
             </button>
           </div>
         </div>
@@ -45,13 +54,13 @@ export default function ShareModal({ checkId, onClose }) {
           href={pdfUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="block w-full text-center bg-gray-700 hover:bg-gray-600 text-white py-2 rounded-lg text-sm transition"
+          className="ss-btn-secondary w-full text-center text-sm py-2.5 mb-3"
         >
-          📄 Download PDF Report
+          📄 {t('share.downloadPdf')}
         </a>
 
-        <p className="text-gray-600 text-xs mt-3 text-center">
-          This link is public — anyone with it can view the report.
+        <p className="text-[#D1D5DB]/40 text-xs text-center">
+          {t('results.publicReport')} — {shareUrl.split('/').pop()}
         </p>
       </div>
     </div>

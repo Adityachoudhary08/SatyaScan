@@ -1,4 +1,5 @@
 import { compareClaimWithSources } from "../utils/genai.js";
+import { normalizeLanguage } from "../utils/languageUtils.js";
 
 const NEWS_API_URL = "https://newsapi.org/v2/everything";
 const FACT_CHECK_API_URL =
@@ -277,12 +278,13 @@ const dedupeSources = (sources) => {
   });
 };
 
-export const verifyClaim = async (claim) => {
+export const verifyClaim = async (claim, responseLanguage = "en") => {
   if (!claim?.trim()) {
     throw new Error("Claim is required");
   }
 
   const trimmedClaim = claim.trim();
+  const language = normalizeLanguage(responseLanguage);
 
   const [newsSources, factCheckSources, wikipediaSources] = await Promise.all([
     fetchNewsSources(trimmedClaim),
@@ -315,7 +317,8 @@ export const verifyClaim = async (claim) => {
 
   const { verdict, confidence, reasoning } = await compareClaimWithSources(
     trimmedClaim,
-    sources
+    sources,
+    language
   );
 
   const trustedSourceCount = sources.filter((s) => s.trusted).length;

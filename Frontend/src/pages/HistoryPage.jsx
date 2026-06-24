@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getHistory, deleteHistoryItem } from '../api/api';
 import { useAuth } from '../context/AuthContext';
+import { useTranslation } from '../context/LanguageContext';
 
 function getTrustColor(score) {
-  if (score >= 70) return 'text-green-400';
+  if (score >= 70) return 'text-[#14B8A6]';
   if (score >= 40) return 'text-yellow-400';
   return 'text-red-400';
 }
@@ -19,6 +20,7 @@ function getVerdictSummary(claims = []) {
 }
 
 export default function HistoryPage() {
+  const { t } = useTranslation();
   const { isLoggedIn } = useAuth();
   const navigate = useNavigate();
   const [checks, setChecks] = useState([]);
@@ -43,21 +45,26 @@ export default function HistoryPage() {
 
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center text-center px-4">
-        <p className="text-gray-400 mb-4">You need to be logged in to view history.</p>
-        <a href="/login" className="text-blue-400 hover:underline">Login →</a>
+      <div className="min-h-screen bg-[#0B0B0B] flex flex-col items-center justify-center text-center px-4">
+        <div className="ss-card max-w-sm w-full text-center py-12">
+          <p className="text-4xl mb-4">🔒</p>
+          <p className="text-[#D1D5DB] mb-6">{t('history.loginRequired')}</p>
+          <a href="/login" className="ss-btn-primary text-sm px-6 py-2.5">
+            {t('history.loginLink')} →
+          </a>
+        </div>
       </div>
     );
   }
 
   const handleDelete = async (id) => {
-    if (!confirm('Delete this check?')) return;
+    if (!confirm(t('history.deleteConfirm'))) return;
     setDeletingId(id);
     try {
       await deleteHistoryItem(id);
       setChecks((prev) => prev.filter((c) => c._id !== id));
     } catch {
-      alert('Failed to delete');
+      alert(t('history.deleteFailed'));
     } finally {
       setDeletingId(null);
     }
@@ -84,17 +91,26 @@ export default function HistoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-950 px-4 py-10">
+    <div className="min-h-screen bg-[#0B0B0B] px-4 py-10">
       <div className="max-w-3xl mx-auto">
-        <h1 className="text-2xl font-bold text-white mb-6">History</h1>
+        <h1 className="text-3xl font-extrabold text-white mb-2">{t('history.title')}</h1>
+        <div className="w-16 h-1 bg-[#14B8A6] rounded-full mb-8" />
 
-        {loading && <p className="text-gray-400">Loading…</p>}
-        {error && <p className="text-red-400">{error}</p>}
+        {loading && (
+          <div className="flex items-center gap-2 text-[#D1D5DB]">
+            <span className="w-4 h-4 border-2 border-[#2A2A2A] border-t-[#14B8A6] rounded-full animate-spin" />
+            {t('history.loading')}…
+          </div>
+        )}
+        {error && <p className="text-red-400 mb-4">{error}</p>}
 
         {!loading && checks.length === 0 && (
-          <div className="text-center text-gray-500 mt-16">
-            <p className="mb-2">No checks yet.</p>
-            <a href="/analyze" className="text-blue-400 hover:underline">Run your first analysis →</a>
+          <div className="ss-card text-center py-16">
+            <p className="text-4xl mb-4">📋</p>
+            <p className="text-[#D1D5DB] mb-4">{t('history.empty')}</p>
+            <a href="/analyze" className="ss-btn-primary text-sm px-5 py-2.5">
+              {t('history.emptyLink')} →
+            </a>
           </div>
         )}
 
@@ -102,40 +118,40 @@ export default function HistoryPage() {
           {checks.map((check) => (
             <div
               key={check._id}
-              className="bg-gray-900 border border-gray-700 rounded-xl p-5 hover:border-gray-500 transition cursor-pointer"
+              className="ss-card cursor-pointer hover:border-[#14B8A6]/40 transition-all duration-200"
               onClick={() => handleClick(check)}
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs bg-gray-700 text-gray-300 px-2 py-0.5 rounded capitalize">
-                      {check.inputType}
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="text-xs bg-[#0B0B0B] border border-[#2A2A2A] text-[#D1D5DB] px-2 py-0.5 rounded-lg capitalize">
+                      {check.inputType === 'text' ? '📝' : check.inputType === 'url' ? '🔗' : '🖼️'} {check.inputType}
                     </span>
                     {check.language && check.language !== 'unknown' && (
-                      <span className="text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">
+                      <span className="text-xs bg-[#14B8A6]/10 border border-[#14B8A6]/30 text-[#14B8A6] px-2 py-0.5 rounded-lg">
                         {check.language.toUpperCase()}
                       </span>
                     )}
-                    <span className="text-xs text-gray-600">
+                    <span className="text-xs text-[#D1D5DB]/40">
                       {new Date(check.createdAt).toLocaleString()}
                     </span>
                   </div>
-                  <p className="text-gray-300 text-sm truncate">
+                  <p className="text-[#D1D5DB] text-sm truncate">
                     {check.originalText?.slice(0, 120)}{check.originalText?.length > 120 ? '…' : ''}
                   </p>
-                  <p className="text-gray-500 text-xs mt-1">{getVerdictSummary(check.claims)}</p>
+                  <p className="text-[#D1D5DB]/40 text-xs mt-1 font-mono">{getVerdictSummary(check.claims)}</p>
                 </div>
                 <div className="flex flex-col items-end gap-2 shrink-0">
                   <span className={`text-2xl font-extrabold ${getTrustColor(check.trustScore)}`}>
                     {check.trustScore}
                   </span>
-                  <span className="text-xs text-gray-600">Trust</span>
+                  <span className="text-xs text-[#D1D5DB]/40">{t('history.trust')}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(check._id); }}
                     disabled={deletingId === check._id}
-                    className="text-xs text-red-500 hover:text-red-400 disabled:opacity-50"
+                    className="text-xs text-red-500 hover:text-red-400 disabled:opacity-50 transition-colors"
                   >
-                    {deletingId === check._id ? '…' : 'Delete'}
+                    {deletingId === check._id ? t('history.deleting') : t('history.delete')}
                   </button>
                 </div>
               </div>
@@ -149,19 +165,19 @@ export default function HistoryPage() {
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => p - 1)}
-              className="px-4 py-2 text-sm bg-gray-800 text-gray-300 rounded disabled:opacity-40 hover:bg-gray-700"
+              className="ss-btn-secondary px-4 py-2 text-sm disabled:opacity-40"
             >
-              ← Prev
+              ← {t('history.prev')}
             </button>
-            <span className="text-gray-400 text-sm self-center">
-              Page {pagination.page} / {pagination.totalPages}
+            <span className="text-[#D1D5DB] text-sm self-center">
+              {t('history.page')} {pagination.page} {t('history.of')} {pagination.totalPages}
             </span>
             <button
               disabled={page === pagination.totalPages}
               onClick={() => setPage((p) => p + 1)}
-              className="px-4 py-2 text-sm bg-gray-800 text-gray-300 rounded disabled:opacity-40 hover:bg-gray-700"
+              className="ss-btn-secondary px-4 py-2 text-sm disabled:opacity-40"
             >
-              Next →
+              {t('history.next')} →
             </button>
           </div>
         )}

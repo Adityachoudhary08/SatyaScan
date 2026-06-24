@@ -11,19 +11,20 @@ export const login = (email, password) =>
 /**
  * POST /api/analyze
  *
- * For type='text' | type='url':  send { type, content }
- * For type='image':              send FormData with fields type + file (the image)
+ * For type='text' | type='url':  send { type, content, selectedLanguage }
+ * For type='image':              send FormData with fields type + file (the image) + selectedLanguage
  */
-export const analyzeText = (content) =>
-  client.post('/analyze', { type: 'text', content });
+export const analyzeText = (content, selectedLanguage = 'auto') =>
+  client.post('/analyze', { type: 'text', content, selectedLanguage });
 
-export const analyzeUrl = (url) =>
-  client.post('/analyze', { type: 'url', content: url });
+export const analyzeUrl = (url, selectedLanguage = 'auto') =>
+  client.post('/analyze', { type: 'url', content: url, selectedLanguage });
 
-export const analyzeImage = (imageFile) => {
+export const analyzeImage = (imageFile, selectedLanguage = 'auto') => {
   const form = new FormData();
   form.append('type', 'image');
   form.append('file', imageFile);
+  form.append('selectedLanguage', selectedLanguage);
   return client.post('/analyze', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });

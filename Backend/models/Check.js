@@ -37,6 +37,16 @@ const checkSchema = new mongoose.Schema({
     type: String,
     default: "en",
   },
+  detectedLanguage: {
+    type: String,
+    default: "en",
+    description: "Auto-detected language of input",
+  },
+  responseLanguage: {
+    type: String,
+    default: "en",
+    description: "Language used for AI responses",
+  },
   claims: {
     type: [claimSchema],
     default: [],
