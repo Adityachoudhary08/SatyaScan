@@ -73,78 +73,121 @@ export const buildVerdictPrompt = (language) => {
   const fullName = getFullLanguageName(normalized);
   const instruction = createLanguageInstruction(normalized);
 
-  const basePrompt = `You are a fact-checking assistant with access to the supplied sources below. Use them as your primary evidence.
+  const basePrompt = `You are a fact verification engine. You MUST analyze ONLY the evidence provided in the user message.
+NEVER invent facts. NEVER fabricate sources. NEVER use knowledge outside the supplied evidence.
 
-VERDICT RULES — apply in this order:
+VERDICT RULES — apply strictly:
 
-────────────────────────────────────────────
-"Supported"
-────────────────────────────────────────────
-A supplied source directly and clearly confirms that the claim is true.
+TRUE — Multiple trusted sources confirm the claim.
+FALSE — Trusted sources directly contradict the claim.
+MISLEADING — Claim contains partial truth but omits important context.
+PARTIALLY_TRUE — Some parts of the claim are confirmed, others are not or are contradicted.
+UNVERIFIED — Insufficient evidence to determine truth. Use when evidence is weak, unrelated, or absent.
 
-────────────────────────────────────────────
-"Contradicted"
-────────────────────────────────────────────
-Use "Contradicted" when EITHER condition is met using supplied sources:
+If evidence is insufficient, verdict MUST be UNVERIFIED. Never guess.
 
-  1. DIRECT contradiction:
-     A source explicitly states the opposite of the claim.
-     Example: Claim = "India won the 2022 FIFA World Cup"
-              Source: "Argentina won the 2022 FIFA World Cup" → Contradicted
+CONFIDENCE (integer 0-100):
+- Multiple trusted sources align → 85-100
+- One trusted source aligns → 70-84
+- Weaker or mixed sources → 40-69
+- UNVERIFIED → 0-30
 
-  2. LOGICAL contradiction:
-     A source provides authoritative facts that make the claim factually impossible,
-     even if it does not use the exact same words.
-     Example: Claim = "The Moon is made of cheese."
-              Source: "The Moon is composed primarily of silicate rock and metal." → Contradicted
+For each source you cite, set supportsClaim: true if it supports the claim, false if it contradicts.
 
-  Key test: Could a reasonable person conclude from the source's facts alone
-  that the claim is false? If yes, use Contradicted.
+Respond ONLY with valid JSON:
+{
+  "verdict": "TRUE" | "FALSE" | "MISLEADING" | "PARTIALLY_TRUE" | "UNVERIFIED",
+  "confidence": 80,
+  "summary": "one-sentence verdict summary",
+  "reasoning": "2-4 sentences citing specific evidence by title/publisher",
+  "sources": [{ "title": "...", "url": "...", "publisher": "...", "publishedAt": "...", "supportsClaim": true }],
+  "supportingSources": [],
+  "contradictingSources": []
+}
 
-────────────────────────────────────────────
-"Unverified"
-────────────────────────────────────────────
-Use ONLY when supplied sources have no meaningful bearing on the claim:
-  - No sources supplied
-  - Sources discuss a related but different topic and cannot confirm or deny the claim
-  - Sources are too vague or general to draw any conclusion
-
-────────────────────────────────────────────
-CONFIDENCE SCORING (integer 0-100):
-────────────────────────────────────────────
-Supported:
-  - Multiple trusted sources support → 90-100
-  - One trusted source supports → 75-89
-  - Only lower-credibility sources support → 55-74
-
-Contradicted:
-  - Multiple trusted sources contradict → 90-100
-  - One trusted source contradicts → 75-89
-  - Only lower-credibility sources contradict → 55-74
-
-Unverified:
-  - No sources supplied at all → 0-20
-  - Sources exist but weak/unrelated → 20-50
-
-Keep reasoning to 1-3 sentences. State which source led to your verdict.
-Respond ONLY with valid JSON, no other text:
-{ "verdict": "Supported" | "Contradicted" | "Unverified", "confidence": 80, "reasoning": "..." }`;
+The "verdict" field MUST be exactly one of: TRUE, FALSE, MISLEADING, PARTIALLY_TRUE, UNVERIFIED (English enum only).`;
 
   if (normalized === "en") {
-    return basePrompt;
+    return `${basePrompt}
+
+The "summary" and "reasoning" fields MUST be in English only.`;
   }
 
   return `${basePrompt}
 
 ${instruction}
 
-The "verdict" field must be in ${fullName}:
-- Use the ${fullName} word for "Supported" verdict
-- Use the ${fullName} word for "Contradicted" verdict  
-- Use the ${fullName} word for "Unverified" verdict
-
-The "reasoning" field must be entirely in ${fullName}, 1-3 sentences max.`;
+The "summary" and "reasoning" fields MUST be entirely in ${fullName}. Do NOT use English in those fields.`;
 };
+
+export const buildImageForensicsPrompt = (language) => {
+  const normalized = normalizeLanguage(language);
+  const fullName = getFullLanguageName(normalized);
+  const instruction = createLanguageInstruction(normalized);
+
+  const basePrompt = `You are a forensic image authenticity analyst. Perform comprehensive visual forensics ONLY on the provided image.
+
+You will also receive structured EXIF metadata findings from a separate metadata analyzer. Use them together with visual analysis.
+
+ANALYZE:
+
+Visual forensics:
+- Lighting consistency, shadow consistency, reflection consistency
+- Object geometry, human anatomy, facial symmetry
+- Finger/hand anomalies, teeth/eye/hair/skin texture issues
+- Background distortions, object warping
+
+AI generation detection:
+- Texture artifacts, diffusion model patterns, synthetic noise
+- Over-smoothed surfaces, unrealistic details, generative artifacts
+
+Deepfake detection:
+- Face replacement, facial blending, skin boundary issues
+- Eye/mouth region anomalies
+
+Manipulation detection:
+- Copy-move tampering, object insertion/removal, splicing, clone artifacts
+
+RULES:
+- Return REAL probabilities 0-100 based on observed evidence. NEVER default to 50.
+- If you cannot assess a signal, use a low value (0-15) with explanation — never guess 50.
+- Verdict MUST be one of: AUTHENTIC, LIKELY_AUTHENTIC, AI_GENERATED, LIKELY_AI_GENERATED, DEEPFAKE, MANIPULATED, INCONCLUSIVE
+- reasoning must be an array of specific bullet-point findings (not generic statements)
+
+Respond ONLY with valid JSON:
+{
+  "verdict": "LIKELY_AI_GENERATED",
+  "confidence": 87,
+  "aiGeneratedProbability": 82,
+  "deepfakeProbability": 12,
+  "manipulationProbability": 18,
+  "lightingConsistency": "consistent" | "inconsistent" | "unclear",
+  "shadowConsistency": "consistent" | "inconsistent" | "unclear",
+  "reflectionConsistency": "consistent" | "inconsistent" | "unclear",
+  "anatomyIssues": ["extra fingers on left hand"],
+  "visualInconsistencies": ["inconsistent reflections in window"],
+  "aiArtifacts": ["diffusion-like skin smoothing"],
+  "deepfakeIndicators": [],
+  "manipulationIndicators": [],
+  "reasoning": ["Metadata stripped", "Unrealistic finger structure", "Diffusion-like texture artifacts"],
+  "explanation": "2-4 sentence summary of the overall assessment"
+}`;
+
+  if (normalized === "en") {
+    return `${basePrompt}
+
+All text fields (reasoning items, explanation, indicator arrays) MUST be in English only.`;
+  }
+
+  return `${basePrompt}
+
+${instruction}
+
+All text fields (reasoning items, explanation, indicator arrays) MUST be in ${fullName} only.`;
+};
+
+/** @deprecated use buildImageForensicsPrompt */
+export const buildImageAnalysisPrompt = buildImageForensicsPrompt;
 
 /**
  * Build AI detection prompt in target language
@@ -219,6 +262,8 @@ export default {
   buildMultilingualPrompt,
   buildExtractClaimsPrompt,
   buildVerdictPrompt,
+  buildImageForensicsPrompt,
+  buildImageAnalysisPrompt,
   buildAIDetectionPrompt,
   buildLanguageDetectionPrompt,
   extractAndParseJSON,

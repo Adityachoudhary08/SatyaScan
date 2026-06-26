@@ -86,6 +86,15 @@ export const getResponseLanguage = (userSelection, detectedLanguage) => {
 };
 
 /**
+ * UI language drives all AI output language — never infer from input text.
+ * Only English and Hindi are supported for verification output.
+ */
+export const getUiResponseLanguage = (uiLanguage) => {
+  const normalized = (uiLanguage || "en").toLowerCase().trim();
+  return normalized === "hi" ? "hi" : "en";
+};
+
+/**
  * Map language code to language name for Mistral prompts
  * @param {string} code - Language code
  * @returns {string} Full language name
@@ -182,5 +191,6 @@ export default {
   getResponseLanguage,
   getFullLanguageName,
   translateVerdict,
+  getUiResponseLanguage,
   createLanguageInstruction,
 };

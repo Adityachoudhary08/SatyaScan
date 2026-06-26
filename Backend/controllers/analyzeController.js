@@ -1,33 +1,29 @@
 import fs from "fs/promises";
 import Check from "../models/Check.js";
 import { verifyClaim } from "./factCheckController.js";
-import {
-  detectAIContent,
-  detectAndTranslate,
-  extractClaims,
-} from "../utils/genai.js";
-import { extractTextFromImage } from "../utils/ocr.js";
+import { detectAndTranslate, extractClaims } from "../utils/genai.js";
+import { runImageAuthenticityPipeline } from "../utils/imageAuthenticity.js";
 import { scrapeArticleFromUrl } from "../utils/scraper.js";
 import {
   calculateTrustScore,
+  deriveOverallVerdict,
   getDomainCredibility,
 } from "../utils/scoring.js";
 import { generateHash, getFromCache, setCache } from "../utils/cache.js";
 import {
   normalizeLanguage,
-  getResponseLanguage,
+  getUiResponseLanguage,
 } from "../utils/languageUtils.js";
 
-const ANALYSIS_TIMEOUT_MS = 60_000;
+const ANALYSIS_TIMEOUT_MS = 90_000;
 const DEFAULT_SOURCE_CREDIBILITY = 60;
-const DEFAULT_AI_LIKELIHOOD = 50;
 
 const withTimeout = (promise, ms) =>
   Promise.race([
     promise,
     new Promise((_, reject) => {
       setTimeout(
-        () => reject(new Error("Analysis timed out after 60 seconds")),
+        () => reject(new Error("Analysis timed out after 90 seconds")),
         ms
       );
     }),
@@ -42,96 +38,108 @@ const safeStep = async (label, fn, fallback) => {
   }
 };
 
-const resolveInputText = async (type, content, file) => {
-  if (type === "text") {
-    if (!content?.trim()) {
-      throw new Error("Content is required for type 'text'");
-    }
-    return content.trim();
-  }
-
-  if (type === "url") {
-    if (!content?.trim()) {
-      throw new Error("Content URL is required for type 'url'");
-    }
-    return scrapeArticleFromUrl(content.trim());
-  }
-
-  if (type === "image") {
-    if (!file?.path) {
-      throw new Error("Image file is required for type 'image'");
-    }
-    try {
-      return await extractTextFromImage(file.path);
-    } finally {
-      await fs.unlink(file.path).catch((error) => {
-        console.warn(`Failed to delete uploaded image: ${error.message}`);
-      });
-    }
-  }
-
-  throw new Error('Invalid type. Must be "text", "url", or "image"');
+const cleanupUploadedFile = async (file) => {
+  if (!file?.path) return;
+  await fs.unlink(file.path).catch((error) => {
+    console.warn(`Failed to delete uploaded image: ${error.message}`);
+  });
 };
 
-const runAnalysis = async (req) => {
+const runImageAnalysis = async (req) => {
+  const uiLanguage = getUiResponseLanguage(req.body.uiLanguage);
+
+  if (!req.file?.path) {
+    throw new Error("Image file is required for type 'image'");
+  }
+
+  const imageBuffer = await fs.readFile(req.file.path);
+  const mimeType = req.file.mimetype;
+
+  try {
+    const imageAnalysis = await runImageAuthenticityPipeline(
+      imageBuffer,
+      mimeType,
+      uiLanguage
+    );
+
+    const apiWorking = imageAnalysis.status === "success";
+    const trustScore =
+      imageAnalysis.status === "success" ? imageAnalysis.trustScore : 0;
+
+    let checkId = null;
+    try {
+      const check = await Check.create({
+        userId: req.user?._id ?? null,
+        inputType: "image",
+        originalText: "[image]",
+        language: uiLanguage,
+        detectedLanguage: "unknown",
+        responseLanguage: uiLanguage,
+        uiLanguage,
+        claims: [],
+        imageAnalysis,
+        sourceScore: 0,
+        trustScore,
+      });
+      checkId = check._id;
+    } catch (dbError) {
+      console.warn(`[DB] Failed to save image check: ${dbError.message}`);
+    }
+
+    return {
+      inputType: "image",
+      analysisMode: "image_authenticity",
+      uiLanguage,
+      responseLanguage: uiLanguage,
+      imageAnalysis,
+      claims: [],
+      trustScore,
+      checkId,
+      apiWorking,
+    };
+  } finally {
+    await cleanupUploadedFile(req.file);
+  }
+};
+
+const runTextAnalysis = async (req) => {
   const type = req.body.type;
   const content = req.body.content;
-  const selectedLanguage = normalizeLanguage(req.body.selectedLanguage || "auto");
+  const uiLanguage = getUiResponseLanguage(req.body.uiLanguage);
   const inputUrl = type === "url" ? content?.trim() : null;
 
-  const rawText = await resolveInputText(type, content, req.file);
+  let rawText;
+  if (type === "text") {
+    if (!content?.trim()) throw new Error("Content is required for type 'text'");
+    rawText = content.trim();
+  } else {
+    if (!content?.trim()) throw new Error("Content URL is required for type 'url'");
+    rawText = await scrapeArticleFromUrl(content.trim());
+  }
+
   if (!rawText) {
     throw new Error("No text could be extracted from the provided input");
   }
 
-  // ── OCR coherence check ─────────────────────────────────────────────────────
-  // If the image has no real text (pure visual / AI-generated artwork), Tesseract
-  // returns pixel noise that looks like random characters. Detect this by measuring
-  // the ratio of alphanumeric characters in the extracted text.
-  // Threshold: if < 40% of non-whitespace chars are alphanumeric → treat as image-only.
-  let isGarbledOcr = false;
-  if (type === "image") {
-    const stripped = rawText.replace(/\s+/g, "");
-    if (stripped.length > 0) {
-      const alphaNum = stripped.replace(/[^a-zA-Z0-9]/g, "").length;
-      const ratio = alphaNum / stripped.length;
-      if (ratio < 0.40 || stripped.length < 20) {
-        isGarbledOcr = true;
-        console.log(`[OCR] Garbled output detected (ratio=${ratio.toFixed(2)}, len=${stripped.length}). Treating as visual image.`);
-      }
-    } else {
-      isGarbledOcr = true;
-    }
-  }
-
-  // Track whether real AI analysis succeeded or fell back to defaults
   let apiWorking = true;
 
-  // Detect language
   const { language: detectedLanguage, translatedText } = await safeStep(
     "detectAndTranslate",
     () => detectAndTranslate(rawText),
     { language: "unknown", translatedText: rawText }
   );
 
-  // Normalize detected language
   const normalizedDetected = normalizeLanguage(detectedLanguage);
+  const responseLanguage = uiLanguage;
 
-  // Determine response language
-  const responseLanguage = getResponseLanguage(selectedLanguage, normalizedDetected);
+  const extractedClaims = await safeStep(
+    "extractClaims",
+    () => extractClaims(translatedText, "en"),
+    []
+  );
 
-  // Skip claim extraction entirely for garbled OCR (pure visual images)
-  const extractedClaims = isGarbledOcr
-    ? []
-    : await safeStep(
-        "extractClaims",
-        () => extractClaims(translatedText, responseLanguage),
-        []
-      );
-
-  const claimsToVerify = isGarbledOcr
-    ? [] // no claims for visual-only images
-    : extractedClaims.length > 0
+  const claimsToVerify =
+    extractedClaims.length > 0
       ? extractedClaims
       : translatedText.trim().split(/\s+/).length >= 4
         ? [{ claim: translatedText.trim() }]
@@ -145,32 +153,18 @@ const runAnalysis = async (req) => {
         () => verifyClaim(claimText, responseLanguage),
         {
           claim: claimText,
-          verdict: "Unverified",
+          verdict: "UNVERIFIED",
+          confidence: 0,
+          summary: "Verification unavailable due to an upstream error",
           reasoning: "Verification unavailable due to an upstream error",
           sources: [],
+          evidenceCount: 0,
+          supportingSources: [],
+          contradictingSources: [],
         }
       );
     })
   );
-
-  // For visual images with no readable text, use the raw OCR output for AI detection
-  // but fall back to a descriptive message so the UI shows something useful
-  const aiDetectionText = isGarbledOcr
-    ? rawText.length > 10 ? rawText : "Visual image with no extractable text"
-    : translatedText;
-
-  const aiResult = await safeStep(
-    "detectAIContent",
-    () => detectAIContent(aiDetectionText, responseLanguage),
-    null
-  );
-
-  // null means AI detection failed → mark API as not working
-  const aiLikelihood = aiResult?.aiLikelihood ?? DEFAULT_AI_LIKELIHOOD;
-  const aiReasoning = isGarbledOcr && !aiResult
-    ? "This appears to be a purely visual image with no readable text. AI content analysis was run on the pixel-extracted data."
-    : (aiResult?.reasoning ?? "AI detection unavailable. Please check your AI provider API key.");
-  if (!aiResult) apiWorking = false;
 
   const sourceCredibility = inputUrl
     ? await safeStep(
@@ -181,37 +175,42 @@ const runAnalysis = async (req) => {
     : DEFAULT_SOURCE_CREDIBILITY;
 
   let trustScore = DEFAULT_SOURCE_CREDIBILITY;
-  let aiScore = 100 - aiLikelihood;
-  let sourceScore = sourceCredibility;
-
   if (verifiedClaims.length > 0) {
-    const scores = calculateTrustScore(
-      verifiedClaims,
-      aiLikelihood,
-      sourceCredibility
-    );
-    trustScore = scores.trustScore;
-    aiScore = scores.aiScore;
-    sourceScore = scores.sourceScore;
-  } else {
-    trustScore = Math.round(
-      aiScore * 0.25 + sourceScore * 0.25 + 50 * 0.5
-    );
+    trustScore = calculateTrustScore(verifiedClaims, sourceCredibility).trustScore;
   }
 
+  const overall = deriveOverallVerdict(verifiedClaims);
+  const primaryClaim = verifiedClaims[0];
+
   const claimsForResponse = verifiedClaims.map(
-    ({ claim, verdict, confidence, reasoning, sources, sourceCount, trustedSourceCount }) => ({
+    ({
+      claim,
+      verdict,
+      confidence,
+      summary,
+      reasoning,
+      sources,
+      evidenceCount,
+      supportingSources,
+      contradictingSources,
+      sourceCount,
+      trustedSourceCount,
+    }) => ({
       text: claim,
       verdict,
       confidence,
-      reasoning: isGarbledOcr && !reasoning
-        ? "No readable text was found in this image. The image appears to be a pure visual with no embedded text."
-        : reasoning,
+      summary,
+      reasoning,
       sources,
+      evidenceCount,
+      supportingSources,
+      contradictingSources,
       sourceCount,
       trustedSourceCount,
     })
   );
+
+  const evidenceCount = verifiedClaims.flatMap((c) => c.sources || []).length;
 
   let checkId = null;
   try {
@@ -222,35 +221,48 @@ const runAnalysis = async (req) => {
       language: normalizedDetected,
       detectedLanguage: normalizedDetected,
       responseLanguage,
+      uiLanguage,
       claims: verifiedClaims.map(({ claim, verdict, sources }) => ({
         text: claim,
         verdict,
         sources: sources.map((source) => source.url),
       })),
-      aiScore,
-      sourceScore,
+      sourceScore: sourceCredibility,
       trustScore,
     });
     checkId = check._id;
   } catch (dbError) {
     console.warn(`[DB] Failed to save check result: ${dbError.message}`);
-    console.warn("[DB] Analysis results will still be returned to client.");
   }
 
   return {
     inputType: type,
+    analysisMode: "fact_verification",
     detectedLanguage: normalizedDetected,
     responseLanguage,
+    uiLanguage,
     language: normalizedDetected,
+    verdict: primaryClaim?.verdict ?? overall.verdict,
+    confidence: primaryClaim?.confidence ?? overall.confidence,
+    summary: primaryClaim?.summary ?? "",
+    reasoning: primaryClaim?.reasoning ?? "",
+    evidenceCount,
+    supportingSources: primaryClaim?.supportingSources ?? [],
+    contradictingSources: primaryClaim?.contradictingSources ?? [],
     claims: claimsForResponse,
-    aiLikelihood,
-    aiReasoning,
-    aiScore,
     sourceCredibility,
     trustScore,
     checkId,
-    apiWorking,  // false when the AI provider key is invalid/missing and scores use fallback defaults
+    apiWorking,
   };
+};
+
+const runAnalysis = async (req) => {
+  const type = req.body.type;
+  if (type === "image") {
+    return runImageAnalysis(req);
+  }
+  return runTextAnalysis(req);
 };
 
 export const analyze = async (req, res) => {
@@ -263,14 +275,20 @@ export const analyze = async (req, res) => {
       });
     }
 
-    // Generate cache key based on input content + language preference
     const content = req.body.content || "";
-    const selectedLanguage = normalizeLanguage(req.body.selectedLanguage || "auto");
-    const cacheKey = generateHash(`${type}:${content}:${selectedLanguage}`);
+    const uiLanguage = getUiResponseLanguage(req.body.uiLanguage);
 
-    // Check cache first
+    let cacheKey;
+    if (type === "image" && req.file?.path) {
+      const fileBuffer = await fs.readFile(req.file.path);
+      cacheKey = generateHash(`image:${fileBuffer.toString("base64").slice(0, 4096)}:${uiLanguage}`);
+    } else {
+      cacheKey = generateHash(`${type}:${content}:${uiLanguage}`);
+    }
+
     const cachedResult = getFromCache(cacheKey);
     if (cachedResult) {
+      if (type === "image") await cleanupUploadedFile(req.file);
       console.log(`[${new Date().toISOString()}] Cache hit for analyze request`);
       return res.status(200).json(cachedResult);
     }
@@ -279,18 +297,16 @@ export const analyze = async (req, res) => {
 
     const result = await withTimeout(runAnalysis(req), ANALYSIS_TIMEOUT_MS);
 
-    // Cache the result
     setCache(cacheKey, result);
-    console.log(`[${new Date().toISOString()}] Analysis result cached with key: ${cacheKey}`);
+    console.log(`[${new Date().toISOString()}] Analysis result cached`);
 
     res.status(200).json(result);
   } catch (error) {
+    await cleanupUploadedFile(req.file);
     console.error(`[${new Date().toISOString()}] Analyze request failed:`, error.message);
 
     if (error.message.includes("timed out")) {
-      return res.status(504).json({
-        message: error.message,
-      });
+      return res.status(504).json({ message: error.message });
     }
 
     res.status(500).json({

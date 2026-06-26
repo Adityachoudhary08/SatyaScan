@@ -2,10 +2,7 @@ import { Mistral } from "@mistralai/mistralai";
 import { getFallback } from "./fallbacks.js";
 import {
   buildExtractClaimsPrompt,
-  buildVerdictPrompt,
-  buildAIDetectionPrompt,
   buildLanguageDetectionPrompt,
-  extractAndParseJSON,
 } from "./multilingual.js";
 import { normalizeLanguage } from "./languageUtils.js";
 
@@ -123,56 +120,11 @@ export const detectAndTranslate = async (text) => {
 };
 
 export const compareClaimWithSources = async (claim, sources, responseLanguage = "en") => {
-  if (!claim?.trim()) throw new Error("Claim is required");
-
-  const language = normalizeLanguage(responseLanguage);
-  const system = buildVerdictPrompt(language);
-
-  try {
-    const raw = await callMistral(
-      system,
-      JSON.stringify({ claim, sources }, null, 2),
-      "compareClaimWithSources"
-    );
-    const parsed = parseJson(raw, "claim comparison");
-    const validVerdicts = ["Supported", "Contradicted", "Unverified"];
-    if (!parsed?.reasoning || !validVerdicts.includes(parsed?.verdict))
-      throw new Error("Invalid verdict or missing reasoning");
-
-    // Validate confidence — clamp to 0-100, default 50 if missing/invalid
-    const confidence =
-      typeof parsed.confidence === "number" &&
-      parsed.confidence >= 0 &&
-      parsed.confidence <= 100
-        ? Math.round(parsed.confidence)
-        : 50;
-
-    return { verdict: parsed.verdict, confidence, reasoning: parsed.reasoning };
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] compareClaimWithSources failed: ${err.message}`);
-    return getFallback("compareClaimWithSources");
-  }
+  const { analyzeClaimWithEvidence } = await import("./gemini.js");
+  return analyzeClaimWithEvidence(claim, sources, responseLanguage);
 };
 
-export const detectAIContent = async (text, responseLanguage = "en") => {
-  if (!text?.trim()) throw new Error("Text is required");
-
-  const language = normalizeLanguage(responseLanguage);
-  const system = buildAIDetectionPrompt(language);
-
-  try {
-    const raw = await callMistral(system, text, "detectAIContent");
-    const parsed = parseJson(raw, "AI detection");
-    if (
-      typeof parsed?.aiLikelihood !== "number" ||
-      parsed.aiLikelihood < 0 ||
-      parsed.aiLikelihood > 100
-    )
-      throw new Error("aiLikelihood must be 0-100");
-    if (typeof parsed?.reasoning !== "string") throw new Error("Missing reasoning");
-    return { aiLikelihood: Math.round(parsed.aiLikelihood), reasoning: parsed.reasoning };
-  } catch (err) {
-    console.error(`[${new Date().toISOString()}] detectAIContent failed: ${err.message}`);
-    return getFallback("detectAIContent");
-  }
+// Legacy — not used for text claims; image analysis uses analyzeImageContent in gemini.js
+export const detectAIContent = async () => {
+  return null;
 };
