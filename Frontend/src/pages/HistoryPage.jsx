@@ -11,12 +11,15 @@ function getTrustColor(score) {
 }
 
 function getVerdictSummary(claims = []) {
-  const counts = { True: 0, Supported: 0, False: 0, Contradicted: 0, Unverified: 0, Misleading: 0 };
-  claims.forEach((c) => { if (c.verdict in counts) counts[c.verdict]++; });
-  const falseCount = counts.False + counts.Contradicted + counts.Misleading;
-  const trueCount = counts.True + counts.Supported;
-  const unverified = counts.Unverified;
-  return `${trueCount} ✓  ${falseCount} ✗  ${unverified} ?`;
+  const counts = { TRUE: 0, FALSE: 0, MISLEADING: 0, PARTIALLY_TRUE: 0, UNVERIFIED: 0 };
+  claims.forEach((c) => {
+    const v = c.verdict?.toUpperCase().replace(/\s+/g, '_');
+    if (v in counts) counts[v]++;
+    else if (c.verdict === 'Supported') counts.TRUE++;
+    else if (c.verdict === 'Contradicted') counts.FALSE++;
+    else counts.UNVERIFIED++;
+  });
+  return `${counts.TRUE} ✓  ${counts.FALSE} ✗  ${counts.UNVERIFIED} ?`;
 }
 
 export default function HistoryPage() {
@@ -71,21 +74,33 @@ export default function HistoryPage() {
   };
 
   const handleClick = (check) => {
-    // Reconstruct minimal result shape to pass to ResultsPage
+    const isImage = check.inputType === 'image';
     navigate('/results', {
       state: {
-        result: {
-          trustScore: check.trustScore,
-          aiLikelihood: 100 - check.aiScore,
-          sourceCredibility: check.sourceScore,
-          language: check.language,
-          claims: check.claims.map((c) => ({
-            text: c.text,
-            verdict: c.verdict,
-            sources: c.sources?.map((url) => ({ url })) || [],
-          })),
-          checkId: check._id,
-        },
+        result: isImage
+          ? {
+              inputType: 'image',
+              analysisMode: 'image_authenticity',
+              uiLanguage: check.uiLanguage || check.responseLanguage || 'en',
+              imageAnalysis: check.imageAnalysis || { status: 'error', message: 'Image analysis failed' },
+              trustScore: check.trustScore,
+              checkId: check._id,
+            }
+          : {
+              inputType: check.inputType,
+              analysisMode: 'fact_verification',
+              trustScore: check.trustScore,
+              sourceCredibility: check.sourceScore,
+              uiLanguage: check.uiLanguage || check.responseLanguage || 'en',
+              language: check.language,
+              claims: check.claims.map((c) => ({
+                text: c.text,
+                verdict: c.verdict,
+                sources: c.sources?.map((url) => ({ url })) || [],
+              })),
+              verdict: check.claims?.[0]?.verdict || 'UNVERIFIED',
+              checkId: check._id,
+            },
       },
     });
   };

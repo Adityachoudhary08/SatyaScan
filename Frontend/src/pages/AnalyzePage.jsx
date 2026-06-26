@@ -12,7 +12,7 @@ function useFakeProgress(active) {
   const [step, setStep] = useState(0);
   useEffect(() => {
     if (!active) { setStep(0); return; }
-    const delays = [3000, 7000, 15000, 30000, 45000];
+    const delays = [3000, 8000, 18000, 35000];
     const timers = delays.map((d, i) => setTimeout(() => setStep(i + 1), d));
     return () => timers.forEach(clearTimeout);
   }, [active]);
@@ -40,7 +40,7 @@ function ShieldLogo({ size = 22 }) {
 export default function AnalyzePage() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { selectedLanguage, setDetectedLanguage } = useLanguage();
+  const { uiLang, setDetectedLanguage } = useLanguage();
   const { t } = useTranslation();
 
   const TABS = [
@@ -67,9 +67,9 @@ export default function AnalyzePage() {
     setLoading(true);
     try {
       let res;
-      if (tab === 'text') res = await analyzeText(textInput, selectedLanguage);
-      else if (tab === 'url') res = await analyzeUrl(urlInput, selectedLanguage);
-      else res = await analyzeImage(imageFile, selectedLanguage);
+      if (tab === 'text') res = await analyzeText(textInput, uiLang);
+      else if (tab === 'url') res = await analyzeUrl(urlInput, uiLang);
+      else res = await analyzeImage(imageFile, uiLang);
 
       // Update detected language in context
       if (res.data?.detectedLanguage) {

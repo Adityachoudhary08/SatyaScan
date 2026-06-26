@@ -4,6 +4,7 @@ const TRUSTED_DOMAINS = {
   "reuters.com": 95,
   "ndtv.com": 90,
   "thehindu.com": 91,
+  "indianexpress.com": 91,
   "apnews.com": 94,
   "ap.org": 94,
   "nytimes.com": 91,
@@ -17,26 +18,21 @@ const TRUSTED_DOMAINS = {
 const DEFAULT_CREDIBILITY = 40;
 
 const CLAIM_WEIGHTS = {
+  TRUE: 1,
+  PARTIALLY_TRUE: 0.7,
+  MISLEADING: 0.35,
+  UNVERIFIED: 0.5,
+  FALSE: 0,
   Supported: 1,
-  Unverified: 0.5,
   Contradicted: 0,
+  Unverified: 0.5,
 };
 
-const getClaimWeight = (verdict) => {
-  return CLAIM_WEIGHTS[verdict] ?? 0;
-};
+const getClaimWeight = (verdict) => CLAIM_WEIGHTS[verdict] ?? 0;
 
-export const calculateTrustScore = (claims, aiLikelihood, sourceCredibility) => {
+export const calculateTrustScore = (claims, sourceCredibility) => {
   if (!Array.isArray(claims) || claims.length === 0) {
     throw new Error("At least one claim is required to calculate trust score");
-  }
-
-  if (
-    typeof aiLikelihood !== "number" ||
-    aiLikelihood < 0 ||
-    aiLikelihood > 100
-  ) {
-    throw new Error("aiLikelihood must be a number between 0 and 100");
   }
 
   if (
@@ -52,16 +48,12 @@ export const calculateTrustScore = (claims, aiLikelihood, sourceCredibility) => 
     0
   );
   const factualAccuracy = (totalWeight / claims.length) * 100;
-  const aiScore = 100 - aiLikelihood;
   const sourceScore = sourceCredibility;
 
-  const trustScore = Math.round(
-    factualAccuracy * 0.5 + aiScore * 0.25 + sourceScore * 0.25
-  );
+  const trustScore = Math.round(factualAccuracy * 0.75 + sourceScore * 0.25);
 
   return {
     factualAccuracy: Math.round(factualAccuracy),
-    aiScore: Math.round(aiScore),
     sourceScore: Math.round(sourceScore),
     trustScore,
   };
@@ -93,6 +85,29 @@ const matchTrustedDomain = (domain) => {
 export const getDomainCredibility = (url) => {
   const domain = extractDomain(url);
   const trustedScore = matchTrustedDomain(domain);
-
   return trustedScore ?? DEFAULT_CREDIBILITY;
+};
+
+export const deriveOverallVerdict = (claims) => {
+  if (!claims?.length) {
+    return { verdict: "UNVERIFIED", confidence: 0 };
+  }
+
+  const priority = { FALSE: 5, MISLEADING: 4, PARTIALLY_TRUE: 3, UNVERIFIED: 2, TRUE: 1 };
+  const sorted = [...claims].sort((a, b) => {
+    const pa = priority[a.verdict] ?? 0;
+    const pb = priority[b.verdict] ?? 0;
+    if (pa !== pb) return pb - pa;
+    return (b.confidence ?? 0) - (a.confidence ?? 0);
+  });
+
+  const primary = sorted[0];
+  const avgConfidence = Math.round(
+    claims.reduce((sum, c) => sum + (c.confidence ?? 0), 0) / claims.length
+  );
+
+  return {
+    verdict: primary.verdict,
+    confidence: primary.confidence ?? avgConfidence,
+  };
 };

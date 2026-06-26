@@ -47,6 +47,14 @@ const checkSchema = new mongoose.Schema({
     default: "en",
     description: "Language used for AI responses",
   },
+  uiLanguage: {
+    type: String,
+    default: "en",
+  },
+  imageAnalysis: {
+    type: mongoose.Schema.Types.Mixed,
+    default: null,
+  },
   claims: {
     type: [claimSchema],
     default: [],

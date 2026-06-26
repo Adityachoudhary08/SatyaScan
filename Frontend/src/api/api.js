@@ -11,44 +11,38 @@ export const login = (email, password) =>
 /**
  * POST /api/analyze
  *
- * For type='text' | type='url':  send { type, content, selectedLanguage }
- * For type='image':              send FormData with fields type + file (the image) + selectedLanguage
+ * uiLanguage drives output language (en | hi) — never inferred from input text.
  */
-export const analyzeText = (content, selectedLanguage = 'auto') =>
-  client.post('/analyze', { type: 'text', content, selectedLanguage });
+export const analyzeText = (content, uiLanguage = 'en') =>
+  client.post('/analyze', { type: 'text', content, uiLanguage });
 
-export const analyzeUrl = (url, selectedLanguage = 'auto') =>
-  client.post('/analyze', { type: 'url', content: url, selectedLanguage });
+export const analyzeUrl = (url, uiLanguage = 'en') =>
+  client.post('/analyze', { type: 'url', content: url, uiLanguage });
 
-export const analyzeImage = (imageFile, selectedLanguage = 'auto') => {
+export const analyzeImage = (imageFile, uiLanguage = 'en') => {
   const form = new FormData();
   form.append('type', 'image');
   form.append('file', imageFile);
-  form.append('selectedLanguage', selectedLanguage);
+  form.append('uiLanguage', uiLanguage);
   return client.post('/analyze', form, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
 };
 
 // ─── History ──────────────────────────────────────────────────────────────────
-/** GET /api/history?page=N — requires auth */
 export const getHistory = (page = 1) =>
   client.get(`/history?page=${page}`);
 
-/** GET /api/history/:id — requires auth */
 export const getHistoryItem = (id) =>
   client.get(`/history/${id}`);
 
-/** DELETE /api/history/:id — requires auth */
 export const deleteHistoryItem = (id) =>
   client.delete(`/history/${id}`);
 
 // ─── Report ───────────────────────────────────────────────────────────────────
-/** GET /api/report/:id — public, returns JSON */
 export const getReport = (id) =>
   client.get(`/report/${id}`);
 
-/** Returns the URL for downloading a PDF report */
 export const getReportPdfUrl = (id) =>
   `/api/report/${id}?format=pdf`;
 

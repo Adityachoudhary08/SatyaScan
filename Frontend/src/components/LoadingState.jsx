@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTranslation } from '../context/LanguageContext';
 
-const STEP_KEYS = ['extract', 'sources', 'evidence', 'ai', 'score'];
+const STEP_KEYS = ['extract', 'sources', 'evidence', 'score'];
 
 function ShieldLogo({ size = 28 }) {
   return (
